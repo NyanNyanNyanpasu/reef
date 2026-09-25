@@ -36,6 +36,7 @@ from reef.observability import (
 from reef.recipe.base import Recipe
 from reef.recipe.checkpoint_strategy import CheckpointStrategy, EveryNVersions
 from reef.runtime.interfaces import RuntimeContractError, TrainingRuntime
+from reef.scenario.history import LearningPage, LearningQuery, read_learning_page
 from reef.scenario.registry import ScenarioRegistry
 from reef.scenario.scenario import Scenario
 from reef.storage.records import RecordConflict, RecordRetention
@@ -317,6 +318,11 @@ class Dispatcher:
             return read_commits(
                 self._registry.require(scenario), after_step=after_step, limit=limit, record_ids=record_ids
             )
+
+    def read_learning_page(self, scenario: str, query: LearningQuery) -> LearningPage:
+        """Capture read-only page data under the scenario's registry lock."""
+        with self._registry.lock_for(scenario):
+            return read_learning_page(self._registry.require(scenario), query)
 
     def scenario_contract(self, scenario: str) -> dict[str, Any]:
         with self._registry.lock_for(scenario):

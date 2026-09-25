@@ -15,7 +15,7 @@ from collections.abc import Mapping
 
 from reef.core.records_types import AgentRecord, RequestType
 from reef.storage.commits import CommitRecord
-from reef.storage.records import AppendResult, RecordStore, StoredRecord
+from reef.storage.records import AppendResult, RecordReference, RecordStore, StoredRecord
 from reef.storage.scenario import ScenarioStorage, ScenarioStore
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,11 @@ class ObservedRecordStore(RecordStore):
 
     def audit_page(self, scenario: str, *, after_sequence: int = 0, limit: int = 256) -> tuple[StoredRecord, ...]:
         return self._inner.audit_page(scenario, after_sequence=after_sequence, limit=limit)
+
+    def reference_page(
+        self, scenario: str, *, after_sequence: int = 0, limit: int = 100
+    ) -> tuple[RecordReference, ...] | None:
+        return self._inner.reference_page(scenario, after_sequence=after_sequence, limit=limit)
 
     def compact(
         self,

@@ -606,6 +606,7 @@ def build_release_page(
     before_files: Mapping[str, str] | None = None,
     node_paths: Mapping[str, str] | None = None,
     link_query: Mapping[str, str] | None = None,
+    learning_url: str | None = None,
 ) -> str:
     """The page for ``rows[step]``, the rows oldest first as ``GET /reef/harness/releases`` lists them.
 
@@ -631,6 +632,8 @@ def build_release_page(
         subtitle += f"Recorded {stamp(recorded)}"
     else:
         subtitle += f"{escape(status_label(selection_result))} in this scenario's catalog"
+    if learning_url is not None:
+        subtitle += f'<br><a href="{escape(learning_url)}">Learning history and consumed records</a>'
     # Every "<" leaves the JSON as \\u003c: a code text holding "</script>" would otherwise close the data block.
     data = json.dumps(row, ensure_ascii=True, sort_keys=True).replace("<", "\\u003c")
     served = served_step(rows)

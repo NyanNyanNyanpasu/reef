@@ -1,4 +1,4 @@
-"""The chrome both harness pages share: the document wrapper, the design tokens and the status vocabulary.
+"""Shared browser-page chrome: document wrapper, design tokens, and status vocabulary.
 
 ``GET /reef/harness/releases/{step}/page`` and
 ``GET /reef/harness/requests/{record_id}/page`` are two views of one thing, a
@@ -6,7 +6,8 @@ request becoming a release, and a person moves between them by the link each
 carries. They therefore share this module's header, palette, card shapes and
 status wording, and each adds only the CSS its own sections need.
 
-Both pages are self-contained: no asset request, no script, the logo inlined
+Learning history reuses this wrapper with its own section and footer labels.
+The pages are self-contained: no asset request, no script, the logo inlined
 so an installed wheel needs no docs checkout, and pure ASCII out so any
 transport carries them. ``document`` is the only place the outer HTML is
 written.
@@ -177,6 +178,8 @@ def document(
     home: str = "",
     head: str = "",
     tail: str = "",
+    section: str = "Harness",
+    footer_label: str = "Harness evolution",
 ) -> str:
     """One page: the head, the branded header, the hero carrying ``state``, then ``body`` and the footer.
 
@@ -184,8 +187,8 @@ def document(
     its own sections need. ``breadcrumb`` is the section the page sits under
     and ``context`` the scenario shown beside it. ``home`` is where the logo
     and the "Harness" crumb lead, the served head's page; both stay plain
-    text when it is empty, since the only pages a browser can open are the
-    two ``/page`` routes and a catalog may have no served head to point at.
+    text when it is empty; a catalog may have no served head to point at.
+    ``section`` and ``footer_label`` let other browser views share the chrome.
     ``head`` adds elements to
     the document head, a reload for instance, and ``tail`` follows the footer,
     where the release page puts its inline data. ``subtitle``, ``body``,
@@ -194,11 +197,11 @@ def document(
     numeric references.
     """
     if home:
-        brand = f'<a class="brand" href="{escape(home)}" aria-label="Harness home">{LOGO}</a>'
-        harness = f'<a href="{escape(home)}">Harness</a>'
+        brand = f'<a class="brand" href="{escape(home)}" aria-label="{escape(section)} home">{LOGO}</a>'
+        harness = f'<a href="{escape(home)}">{escape(section)}</a>'
     else:
         brand = f'<div class="brand">{LOGO}</div>'
-        harness = "<span>Harness</span>"
+        harness = f"<span>{escape(section)}</span>"
     page = (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -214,7 +217,7 @@ def document(
         f'<p class="subtitle">{subtitle}</p></div>'
         f'<div class="status" role="status">{status_span(state)}</div></div>\n'
         f"{body}"
-        '<footer><p><span class="footer-brand">REEF</span> &nbsp; / &nbsp; Harness evolution</p>'
+        f'<footer><p><span class="footer-brand">REEF</span> &nbsp; / &nbsp; {escape(footer_label)}</p>'
         "<p>Built with Reef</p></footer>\n"
         f"</main>\n{tail}</body>\n</html>\n"
     )

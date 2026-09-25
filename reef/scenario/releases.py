@@ -69,6 +69,7 @@ class ScenarioReleases:
                     high_water_offset=record.high_water_offset,
                     metrics=record.metrics,
                     pending=record.pending,
+                    commit_step=record.step,
                 )
                 for record in records
             )
@@ -197,6 +198,7 @@ class ScenarioReleases:
         high_water_offset: int = 0,
         metrics: Mapping[str, Any] | None = None,
         pending: bool = False,
+        commit_step: int | None = None,
     ) -> dict[str, Any]:
         row: dict[str, Any] = {
             "release_id": artifact_ref.release_id,
@@ -207,6 +209,7 @@ class ScenarioReleases:
             "restorable": checkpoint and not isinstance(artifact_ref, LiveWeightArtifactRef),
             "recorded_at": recorded_at,
             "operation": operation,
+            "commit_step": commit_step,
             "pending": pending,
             "current": current,
             "record_progress": {

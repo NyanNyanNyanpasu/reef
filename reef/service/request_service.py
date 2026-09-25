@@ -29,13 +29,16 @@ from reef.harness.tree.render import RenderError, render_composition
 from reef.observability.operations import OperationMeasurement, OperationMetrics
 from reef.recipe.errors import RecipeConfigError
 from reef.runtime.interfaces import InferenceAdmissionHandle, InferenceHandler, InferenceStream
+from reef.scenario.history import LearningQuery
 from reef.scenario.scenario import Scenario
 from reef.service.install_script import TOKEN_PLACEHOLDER, render_install_script
+from reef.service.learning_page import build_learning_page, learning_href
 from reef.service.release_page import before_release_id, build_release_page, result_of
 from reef.service.request_page import STATE_WORDS, build_request_page, request_state, settled_step
 from reef.service.wire import SCENARIO_HEADER, ProposalPayload, ReportPayload, RequestHeaders, parse_request_headers
 from reef.surface.base import InferenceLease, LeasingInferenceHooks, Surface
 from reef.surface.weights import RuntimeLoadMismatch, reported_runtime_load_id, reported_runtime_load_spans
+from reef.train.cordis_backend.backend import CordisBackend
 from reef.train.cordis_backend.contracts import ProposalValidator, StepProgressReader, StepRecords
 from reef.train.cordis_backend.proposals import ProposalInbox
 
@@ -640,6 +643,14 @@ class RequestService:
         except FileNotFoundError as error:
             raise ArtifactNotFound("record file is not retained") from error
 
+    def learning_page(self, scenario: str, query: LearningQuery, token: str | None = None) -> tuple[str, int]:
+        """Read under the dispatcher lock, then render a bounded page outside it."""
+        page = self._dispatcher.read_learning_page(scenario, query)
+        missing = (query.record_id is not None and not page.record_known) or (
+            query.commit_step is not None and page.commit is None
+        )
+        return build_learning_page(page, query, token), 404 if missing else 200
+
     def harness_release_page(
         self, headers: Mapping[str, str], step: int, link_query: Mapping[str, str] | None = None
     ) -> str:
@@ -675,7 +686,14 @@ class RequestService:
                 before_files = None if tree is None else tree.read_files(artifact)
             except ArtifactError:
                 before_files = None
-        descriptor = getattr(scenario.trainer.candidate_backend, "descriptor", None)
+        backend = scenario.trainer.candidate_backend
+        descriptor = backend.descriptor if isinstance(backend, CordisBackend) else None
+        learning_query: dict[str, str | int] = {}
+        if link_query and "token" in link_query:
+            learning_query["token"] = link_query["token"]
+        commit_step = rows[step]["commit_step"]
+        if commit_step is not None:
+            learning_query["commit_step"] = commit_step
         return build_release_page(
             step,
             rows,
@@ -683,6 +701,7 @@ class RequestService:
             before_files=before_files,
             node_paths=None if descriptor is None else descriptor.node_paths,
             link_query=link_query,
+            learning_url=learning_href(scenario.name, learning_query),
         )
 
     def harness_request_page(

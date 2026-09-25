@@ -4,12 +4,40 @@ import asyncio
 
 from aiohttp import web
 
+from reef.scenario.history import LearningQuery
 from reef.scenario.scenario import Scenario
 from reef.service.request_service import RequestService
 from reef.service.routes.payload import read_object
 
 
 def register_scenario_routes(app: web.Application, *, request_service: RequestService) -> None:
+    async def learning_page(request: web.Request) -> web.Response:
+        parameters = request.query
+        for key in parameters:
+            if len(parameters.getall(key)) != 1:
+                raise ValueError("page parameters must not be repeated")
+        if parameters.get("show_payload", "0") not in ("0", "1"):
+            raise ValueError("show_payload must be 0 or 1")
+        query = LearningQuery(
+            record_id=parameters.get("record_id"),
+            commit_step=int(parameters["commit_step"]) if "commit_step" in parameters else None,
+            after_sequence=int(parameters.get("after_sequence", "0")),
+            after_step=int(parameters.get("after_step", "0")),
+            input_offset=int(parameters.get("input_offset", "0")),
+            scan_after=int(parameters["scan_after"]) if "scan_after" in parameters else None,
+            show_payload=parameters.get("show_payload") == "1",
+        )
+        token = None if "Authorization" in request.headers else parameters.get("token")
+        page, status = await asyncio.to_thread(
+            request_service.learning_page, request.match_info["scenario"], query, token
+        )
+        return web.Response(
+            text=page,
+            status=status,
+            content_type="text/html",
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
+
     async def list_scenarios(request: web.Request) -> web.Response:
         return web.json_response({"scenarios": list(request_service.dispatcher.list_scenarios())})
 
@@ -162,6 +190,7 @@ def register_scenario_routes(app: web.Application, *, request_service: RequestSe
     app.router.add_post("/reef/scenarios/{scenario}/update", update_scenario)
     app.router.add_delete("/reef/scenarios/{scenario}", delete_scenario)
     app.router.add_get("/reef/scenarios/{scenario}/contract", scenario_contract)
+    app.router.add_get("/reef/scenarios/{scenario}/learning/page", learning_page)
     app.router.add_get("/reef/scenarios/{scenario}/records", record_list)
     app.router.add_get("/reef/scenarios/{scenario}/commits", commit_list)
     app.router.add_get("/reef/scenarios/{scenario}/records/{record_id}", record_detail)

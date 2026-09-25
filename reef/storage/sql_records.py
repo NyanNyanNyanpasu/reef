@@ -24,7 +24,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from reef.core.artifact_ref import decode_artifact_ref, encode_artifact_ref
 from reef.core.records_types import AgentRecord, RequestType
-from reef.storage.records import AppendResult, RecordConflict, RecordStore, StoredRecord
+from reef.storage.records import AppendResult, RecordConflict, RecordReference, RecordStore, StoredRecord
 
 
 @dataclass(frozen=True)
@@ -493,6 +493,38 @@ class SQLRecordStore(RecordStore):
                 .all()
             )
         return tuple(self._audit_record(row) for row in rows)
+
+    def reference_page(
+        self, scenario: str, *, after_sequence: int = 0, limit: int = 100
+    ) -> tuple[RecordReference, ...]:
+        """Project retained links only, with the adapter's namespace and scenario isolation."""
+        if after_sequence < 0 or limit <= 0:
+            raise ValueError("after_sequence must be non-negative and limit must be positive")
+        table = self._tables.records
+        with self._transaction(scenario, write=False) as connection:
+            rows = (
+                connection.execute(
+                    select(table.c.sequence, table.c.agent_record_id, table.c.request_type, table.c.references_json)
+                    .where(
+                        self._tables.condition(table),
+                        table.c.scenario == scenario,
+                        table.c.sequence > after_sequence,
+                    )
+                    .order_by(table.c.sequence)
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return tuple(
+            RecordReference(
+                sequence=int(row["sequence"]),
+                agent_record_id=row["agent_record_id"],
+                request_type=RequestType(row["request_type"]),
+                references=tuple(json.loads(row["references_json"])),
+            )
+            for row in rows
+        )
 
     @classmethod
     def _audit_record(cls, row: RowMapping) -> StoredRecord:

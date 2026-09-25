@@ -43,6 +43,16 @@ class StoredRecord:
 
 
 @dataclass(frozen=True)
+class RecordReference:
+    """A retained record's links, without loading its payload."""
+
+    sequence: int
+    agent_record_id: str
+    request_type: RequestType
+    references: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RecordRetention:
     """Deployment-wide limits on compacted JSON bodies, applied by service maintenance.
 
@@ -138,6 +148,16 @@ class RecordStore(ABC):
     ) -> tuple[StoredRecord, ...]:
         """Read retained records with the same sequence bounds as ``replay_page``."""
 
+    def reference_page(
+        self, scenario: str, *, after_sequence: int = 0, limit: int = 100
+    ) -> tuple[RecordReference, ...] | None:
+        """Read retained links in append order; None means this optional read is unsupported.
+
+        Includes compacted records until their bodies are purged. The cursor
+        advances over scanned records, not just records matching a reference.
+        """
+        return None
+
     @abstractmethod
     def compact(
         self,
@@ -176,6 +196,7 @@ __all__ = [
     "AgentRecord",
     "AppendResult",
     "RecordConflict",
+    "RecordReference",
     "RecordRetention",
     "RecordStore",
     "RequestType",

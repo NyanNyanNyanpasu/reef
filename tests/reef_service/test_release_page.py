@@ -217,6 +217,8 @@ def test_the_page_for_a_published_step_carries_the_request_the_result_and_the_ch
         assert page.startswith("<!doctype html>") and "<title>Harness v1</title>" in page
         assert '<meta name="viewport" content="width=device-width, initial-scale=1">' in page
         assert "<h1>Harness v1</h1>" in page
+        assert rows[1]["commit_step"] == 1
+        assert "/reef/scenarios/agents/learning/page?commit_step=1" in page
         assert _sections(page) == ["Why", "What changed", "Result", "Setup", "Chain"]
         assert FIRST in _section(page, "Why") and "3f1c2a9d0b7e" in _section(page, "Why")
         changed = _section(page, "What changed")
@@ -276,6 +278,10 @@ def test_the_page_for_a_rejected_step_names_the_head_it_ran_on_and_the_candidate
     try:
         rows = list(reversed(dispatcher.get_or_create_scenario(SCENARIO).releases()))
         page = _page(dispatcher, 2)
+        assert rows[2]["release_id"] == rows[1]["release_id"]
+        assert "/reef/scenarios/agents/learning/page?commit_step=2" in page
+        ((status, _, history),) = _pages(dispatcher, "/reef/scenarios/agents/learning/page?commit_step=2")
+        assert status == 200 and "/reef/harness/releases/2/page?scenario=agents" in history
         assert SECOND in _section(page, "Why") and "s2" in _section(page, "Why")
         assert "<pre>Answer briefly, with care.</pre>" in _section(page, "What changed")
         selection_result = _section(page, "Result")

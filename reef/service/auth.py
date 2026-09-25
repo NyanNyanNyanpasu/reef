@@ -33,8 +33,8 @@ def _digest(token: str) -> bytes:
     return hashlib.sha256(token.encode("utf-8")).digest()
 
 
-#: The harness pages a person opens by a link: the only routes that read the token from the query string.
-PAGE_ROUTES = re.compile(r"^/reef/harness/(requests/[^/]+|releases/\d{1,9})/page$")
+#: Browser pages alone may read a token from the query string.
+PAGE_ROUTES = re.compile(r"^/reef/(harness/(requests/[^/]+|releases/\d{1,9})/page|scenarios/[^/]+/learning/page)$")
 
 
 def create_authentication_middleware(tokens: str | Iterable[str] | None):
@@ -46,7 +46,7 @@ def create_authentication_middleware(tokens: str | Iterable[str] | None):
     authorization is the gateway's job, not Reef's. Error translation lives in
     :mod:`reef.service.errors`.
 
-    The two harness pages (``PAGE_ROUTES``) also accept the token as
+    The browser pages (``PAGE_ROUTES``) also accept the token as
     ``?token=`` on a GET that carries no Authorization header: they are links
     a person opens in a browser, which cannot send the header. The token then
     sits in the URL, in the browser's history and in whatever logs request

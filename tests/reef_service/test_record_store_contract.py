@@ -72,6 +72,25 @@ def test_append_retry_and_scenario_reads(records: RecordStore) -> None:
     assert records.replay("code") == (other,)
 
 
+def test_reference_projection_includes_retired_rows_and_respects_cursors(records: RecordStore) -> None:
+    records.append(record("input"))
+    records.append(record("other", "code"))
+    records.append(record("feedback", references=("input",)))
+    records.compact("math", frozenset({"input", "feedback"}))
+    first = records.reference_page("math", limit=1)
+    assert first is not None and len(first) == 1 and first[0].agent_record_id == "input"
+    tail = records.reference_page("math", after_sequence=first[0].sequence, limit=1)
+    assert tail is not None and len(tail) == 1
+    assert tail[0].agent_record_id == "feedback" and tail[0].references == ("input",)
+    assert records.reference_page("math", after_sequence=tail[0].sequence) == ()
+    with pytest.raises(ValueError):
+        records.reference_page("math", limit=0)
+    with pytest.raises(ValueError):
+        records.reference_page("math", after_sequence=-1)
+    records.purge_compacted("math", before=10**12)
+    assert records.reference_page("math") == ()
+
+
 def test_retirement_purge_and_retry_receipts(records: RecordStore) -> None:
     original = record("first")
     other = record("other", "code")

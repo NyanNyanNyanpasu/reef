@@ -55,6 +55,8 @@ Routes
 +--------------------------------------------------------+---------------------------------------------------+
 | ``GET /reef/scenarios/{scenario}/records/{record_id}`` | one retained record and its trace payload         |
 +--------------------------------------------------------+---------------------------------------------------+
+| ``GET /reef/scenarios/{scenario}/learning/page``         | browsable records, feedback, and committed steps   |
++--------------------------------------------------------+---------------------------------------------------+
 | ``GET /reef/scenarios/{scenario}/releases``            | ``{scenario, releases}``, newest first            |
 +--------------------------------------------------------+---------------------------------------------------+
 | ``POST /reef/scenarios/{scenario}/rollback``           | republish an earlier release as the head          |
@@ -1028,7 +1030,59 @@ workspace. Each response is a live read; concurrent training and retention
 can change subsequent pages. Reading commit pages may scan the scenario's
 cached commit log; the response is bounded, not a new persisted index.
 
-Reef does not join these endpoints into learning links or assign learning
-states, human-readable explanations, policy capability flags, or evaluation
-results. The console owns that interpretation. In particular, compaction
-alone is not proof of consumption, and consumption is not proof of promotion.
+Reef does not assign inferred learning states or reconstruct missing policy
+decisions. Compaction alone is not proof of consumption, and consumption is
+not proof of promotion.
+
+Browsing learning history
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``GET /reef/scenarios/{scenario}/learning/page`` is a read-only HTML view of
+these stored relationships. It lists 20 retained records and 20 commits per
+page, oldest first. Follow a record to its referenced records and commits
+whose ``consumed_ids`` contain that exact ID. Follow a commit to its consumed
+records and, for a harness scenario, its existing evaluation page. Harness
+release pages link back to the corresponding commit. Release catalog rows
+include ``commit_step`` (null for creation or recovery); catalog position and
+commit step are distinct, even when multiple commits share a release ID.
+
+For example, open ``/reef/scenarios/math/learning/page`` or
+``/reef/scenarios/math/learning/page?record_id=receipt-123``.
+The scenario in the path controls every lookup; a header or query scenario
+cannot change it. Unknown scenarios return 404 without creating one.
+
+Optional query parameters:
+
+* ``record_id`` selects one record (1 to 256 characters).
+* ``commit_step`` selects one positive committed step. It cannot be combined
+  with ``record_id``.
+* ``after_sequence`` and ``after_step`` are nonnegative list cursors, initially
+  0. ``input_offset`` pages referenced or consumed IDs in groups of 20.
+* ``show_payload=1`` explicitly loads an escaped payload preview for a record.
+  Ordinary pages contain no payload preview. JSON previews, including metrics,
+  stop at 16,000 characters and visibly mark truncation.
+* ``scan_after`` opts into reverse-reference scanning for ``record_id``.
+  Each request scans up to 100 retained records plus one lookahead row,
+  reading only sequence, ID, type, and references. The next link advances
+  past the last scanned record even when none matched. Reaching the end
+  covers currently retained records only; purged records are absent. Custom
+  storage adapters may decline this optional read, which the page explains.
+
+Cursors default to 0, except ``scan_after``, whose absence disables scanning.
+Repeated parameters and invalid bounds return 400. Missing record bodies
+are still browsable when a consuming commit is recorded; otherwise the
+record view returns 404 with an unavailable-body message. A missing commit
+returns 404. Non-durable scenarios explicitly report unavailable commit
+history. Reads do not change retention, enqueue training, or emit observer
+events. They add no schema, index, or persisted state. Commit filtering may
+scan the existing cached history; pagination bounds the response, not total
+commit-history work. Concurrent commits or purges may change subsequent pages.
+
+This HTML route accepts ``?token=`` on GET when no Authorization header is
+present, like the harness pages. The Authorization header takes precedence.
+Query credentials travel only in internal page links; header credentials
+are never converted to URLs. Query tokens remain visible in browser history
+and request URL logs, so prefer a trusted local deployment or an authenticated
+gateway. JSON endpoints still require header authentication. HTML responses
+use ``Cache-Control: no-store`` and ``Referrer-Policy: no-referrer`` and load
+no external scripts or assets.
